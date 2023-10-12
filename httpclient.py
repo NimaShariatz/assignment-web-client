@@ -41,12 +41,32 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        code_data = data.split(" ")
+        #print(code_data)
+        code_data = code_data[1]
+        code_data = int(code_data)
+        return code_data
 
     def get_headers(self,data):
-        return None
+        the_header = data.split("\r\n\r\n")[0]
+        #print(the_header)
+        return the_header
 
     def get_body(self, data):
+        
+        body_data = data.split("\r\n\r\n")
+        #print("body_data ->", body_data)
+        
+        if body_data is None or (body_data[1]=="[]"):
+            HTML_data= ''
+        else:    
+            HTML_data = body_data[1]
+        #print("body_data at 1", HTML_data)#eg 
+        
+        
+        
+        return HTML_data
+        
         return None
     
     def sendall(self, data):
@@ -70,11 +90,113 @@ class HTTPClient(object):
     def GET(self, url, args=None):
         code = 500
         body = ""
-        return HTTPResponse(code, body)
+    
+        #print("the url->,"url)
+
+        
+        parsed_url = urllib.parse.urlparse(url)#ParseResult(scheme='http', netloc='127.0.0.1:27663', path='/49872398432', params='', query='', fragment='')
+        #print("the url post parse->", parsed_url)
+        derived_scheme = parsed_url.scheme#http
+        derived_host = parsed_url.hostname#127.0.0.1
+        derived_port = parsed_url.port#27663
+        derived_query = parsed_url.query#''
+        
+        #print("\nthe url for GET->", url)
+        #print("the parsed_url->", parsed_url)
+        #print("the scheme->",  derived_scheme)
+        #print("the host->",  derived_host)
+        #print("the port->",  derived_port)
+        #print("the query->",  derived_query + "\n")
+
+
+
+        if (derived_port == None) and (derived_scheme == "http"):# so if we arn't given a port, then set the port to the following
+            derived_port = 80#see https://developer.mozilla.org/en-US/docs/Glossary/Port for why its 80
+        
+        if (derived_port == None) and (derived_scheme == "https"):
+            derived_port = 443  #see https://developer.mozilla.org/en-US/docs/Glossary/Port for why its 443
+                
+        
+        self.connect(derived_host, derived_port)#make the connection
+        
+        get_request = f'GET {url} HTTP/1.1\r\nHost: {derived_host}\r\nConnection: Closed\r\n\r\n'
+        
+        self.sendall(get_request)#make the request
+        
+        data_returned = self.recvall(self.socket)#get the data we are given back
+        #print("data returned->", data_returned)
+        
+        body = self.get_body(data_returned) #returns the HTML data
+        code = self.get_code(data_returned) #returns the code. i.e 200 or 404 or 301 etc...
+        #print("the body->\n", body)
+        #print("the code->", code)
+
+        
+        
+        self.close()
+        
+        return HTTPResponse(code, body)#make the return
+
+
+
+
+
+
+
+
+
 
     def POST(self, url, args=None):
         code = 500
         body = ""
+        
+        #print("the url->,"url)
+        
+        parsed_url = urllib.parse.urlparse(url)
+        #print("the url post parse->", parsed_url)
+        derived_scheme = parsed_url.scheme
+        derived_host = parsed_url.hostname
+        derived_port = parsed_url.port
+        derived_query = parsed_url.query
+        
+        #print("\nthe url for POST->", url)
+        #print("the parsed_url->", parsed_url)
+        #print("the scheme->",  derived_scheme)
+        #print("the host->",  derived_host)
+        #print("the port->",  derived_port)
+        #print("the query->",  derived_query + "\n")
+  
+  
+        if (derived_port == None) and (derived_scheme == "http"):
+            derived_port = 80#see https://developer.mozilla.org/en-US/docs/Glossary/Port for why its 80
+        
+        if (derived_port == None) and (derived_scheme == "https"):
+            derived_port = 443#see https://developer.mozilla.org/en-US/docs/Glossary/Port for why its 443   
+        
+                
+        if args == None:
+            args = " "
+        else:
+            print("THE ARGS NOT EMPTY-> " , args)
+            args = urllib.parse.urlencode(args)
+            print("\nTHE ARGS->" , args , "\n")
+            
+            
+        length_of_args = len(args)
+            
+        post_request = f"POST {url} HTTP/1.1\r\nHost: {derived_host}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {length_of_args}\r\nConnection: close\r\n\r\n{args}"
+
+        self.connect(derived_host, derived_port)
+        self.sendall(post_request)
+        
+        data_returned = self.recvall(self.socket)
+        
+        body = self.get_body(data_returned)
+        code = self.get_code(data_returned)
+        
+        self.close()
+        
+        
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):
